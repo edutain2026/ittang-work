@@ -144,6 +144,20 @@ table.org{width:100%;border-collapse:collapse;min-width:1080px}
 .legend .lc{display:inline-flex;align-items:center;gap:6px}
 .legend i{width:13px;height:13px;border-radius:4px;display:inline-block}
 .savedtag{font-size:11.5px;color:#00762a;font-weight:600}
+/* ---------- v2 추가 스타일 ---------- */
+.lgerr{margin-top:12px;font-size:12.5px;color:#C0392B;background:#FDECEC;border:1px solid #F5C6C6;border-radius:var(--r);padding:9px 12px;line-height:1.5}
+.lgbtn.sec{background:var(--surface);color:var(--ink2);border:1px solid var(--line2);margin-top:10px;font-weight:600}
+.lgbtn.sec:hover{border-color:var(--blue);color:var(--blue);background:var(--blueBg)}
+.lgbtn:disabled{opacity:.55;cursor:default}
+.lgstat{font-size:12px;color:var(--ink3);text-align:center;margin-top:12px}
+.org .mname .mt{font-size:11px;color:var(--ink3);font-weight:400}
+.orgtools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:18px}
+.orgtools input[type=search]{border:1px solid var(--line2);border-radius:8px;padding:7px 10px;font-size:12.5px;background:var(--surface);width:220px}
+.orgtools label{font-size:12px;color:var(--ink3);display:inline-flex;align-items:center;gap:5px}
+.orgtools .cnt{font-size:12px;color:var(--ink3);margin-left:auto}
+.pchip.busy{opacity:.5;pointer-events:none}
+.org tr.inactive td{opacity:.55}
+.topbar .tb-badge{font-size:10.5px;color:#00762a;background:#D9FFE6;border-radius:999px;padding:3px 8px;font-weight:700}
 </style>
 </head>
 <body>
@@ -155,16 +169,14 @@ table.org{width:100%;border-collapse:collapse;min-width:1080px}
       <div class="logo">땅</div>
       <div><div class="bt">아이땅 통합 포털</div><div class="bs">ittang_portal</div></div>
     </div>
-    <label>이메일</label>
-    <input id="lgEmail" type="email" placeholder="name@ittang.co.kr" autocomplete="username"/>
+    <label>이메일 (사내 아이디)</label>
+    <input id="lgEmail" type="email" placeholder="name@i-ttang.co.kr" autocomplete="username"/>
     <label>비밀번호</label>
-    <input id="lgPw" type="password" placeholder="회사 공용 계정" autocomplete="current-password"/>
-    <button class="lgbtn" onclick="loginByEmail()">로그인</button>
-    <div class="lgnote">회사 공용 계정(Supabase Auth 연동 예정)으로 로그인합니다.<br>데모 단계 — 비밀번호는 아직 검증하지 않습니다.</div>
-    <div class="demosec">
-      <div class="dl">데모 계정으로 바로 로그인 (권한 차이 확인용)</div>
-      <div class="demorow" id="demoRow"></div>
-    </div>
+    <input id="lgPw" type="password" placeholder="회사 공용 계정 비밀번호" autocomplete="current-password"/>
+    <button class="lgbtn" id="lgBtn" onclick="doLogin()">로그인</button>
+    <button class="lgbtn sec" id="suBtn" onclick="doSignUp()">처음이면 계정 만들기 (조직도 등록 이메일 + 원하는 비밀번호)</button>
+    <div class="lgerr hide" id="lgErr"></div>
+    <div class="lgstat" id="lgStat">회사 공용 계정(디자인 관리 앱과 동일)으로 로그인합니다.</div>
   </div>
 </div>
 
@@ -173,6 +185,7 @@ table.org{width:100%;border-collapse:collapse;min-width:1080px}
   <div class="topbar">
     <div class="logo" onclick="goLauncher()">땅</div>
     <div class="tb-name" onclick="goLauncher()">아이땅 통합 포털 <small>ittang_portal</small></div>
+    <span class="tb-badge" title="Supabase 공용 명부(members) 연결됨">공용 명부 연결</span>
     <div class="spacer"></div>
     <button class="tb-btn hide" id="orgBtn" onclick="goOrg()">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
@@ -182,7 +195,6 @@ table.org{width:100%;border-collapse:collapse;min-width:1080px}
       <span class="av" id="uav">?</span>
       <span><span class="un" id="uname">-</span> <span class="uu" id="uunit"></span></span>
     </div>
-    <select class="tb-sel" id="userSel" onchange="switchUser(this.value)" title="데모: 로그인 사용자 전환"></select>
     <button class="tb-btn" onclick="logout()">로그아웃</button>
   </div>
 
@@ -190,8 +202,8 @@ table.org{width:100%;border-collapse:collapse;min-width:1080px}
   <div id="launcher" class="launch">
     <div class="hello" id="hello">안녕하세요</div>
     <div class="launchhd">
-      <div class="hellosub" id="hellosub">사용하실 앱을 선택하세요. 권한에 따라 열 수 있는 앱만 활성화됩니다.</div>
-      <button class="reorderReset hide" id="reorderReset" onclick="doResetOrder()">기본 배치로</button>
+      <div class="hellosub" id="hellosub">사용하실 앱을 선택하세요.</div>
+      <button class="reorderReset hide" id="reorderReset" onclick="doResetLayout()">기본 배치로</button>
     </div>
     <div class="grid" id="appGrid"></div>
   </div>
@@ -201,21 +213,26 @@ table.org{width:100%;border-collapse:collapse;min-width:1080px}
     <div class="orghd">
       <div>
         <div class="hello">조직도 · 권한 관리</div>
-        <div class="hellosub">포털이 구성원(members)과 <b>앱별 권한</b>을 소유합니다. 각 앱은 이 값을 읽어 화면을 제어합니다. 셀을 눌러 숨김 → 조회 → 작성 순으로 바꿉니다.</div>
+        <div class="hellosub">회사 공용 명부(<b>members</b>)를 직접 편집합니다. 여기서 바꾸면 디자인 관리 등 <b>모든 앱에 즉시 반영</b>됩니다. 셀을 눌러 숨김 → 조회 → 작성 순으로 바꿉니다.</div>
       </div>
       <div class="orgacts">
         <span class="savedtag hide" id="savedTag">저장됨</span>
-        <button class="resetbtn" id="resetAllBtn" onclick="resetAll()">데모 데이터 초기화</button>
+        <button class="resetbtn" onclick="reloadMembers()">서버에서 다시 불러오기</button>
         <button class="tb-btn" onclick="goLauncher()">← 런처로</button>
       </div>
     </div>
     <div id="orgNotice"></div>
+    <div class="orgtools">
+      <input type="search" id="orgQ" placeholder="이름·소속·직책 검색" oninput="renderOrg()"/>
+      <label><input type="checkbox" id="orgInactive" onchange="renderOrg()"/> 퇴사자 포함</label>
+      <span class="cnt" id="orgCnt"></span>
+    </div>
     <div class="orgtable-wrap"><table class="org" id="orgTable"></table></div>
     <div class="legend">
       <span class="lc"><i style="background:#F1F2F4"></i>숨김 · 런처에서 잠김</span>
       <span class="lc"><i style="background:#EAF0FF"></i>조회 · 열람만</span>
       <span class="lc"><i style="background:#D9FFE6"></i>작성 · 열람+수정</span>
-      <span class="lc" style="margin-left:auto">직급 변경 시 해당 구성원 권한이 직급 기본값으로 초기화됩니다.</span>
+      <span class="lc" style="margin-left:auto">직급 변경 시 그 사람의 <b>앱 권한</b>이 직급 기본값으로 초기화됩니다(다른 앱의 메뉴 권한은 유지).</span>
     </div>
   </div>
 </div>
@@ -229,34 +246,40 @@ table.org{width:100%;border-collapse:collapse;min-width:1080px}
 
 <script>
 /* =========================================================
-   ittang_portal — 얇은 포털 런처 프로토타입
-   · 로그인(회사 공용 계정, 데모) → 권한별 앱 런처 → 앱 열기(iframe/새 창)
-   · 실제 연동 시 교체 지점:
-       (1) 각 앱의 배포주소 = APPS[].url  (배포되면 채우고 deployed:true)
-       (2) 로그인 = Supabase Auth (loginByEmail 내부)
-       (3) 사용자·권한 = Supabase members 테이블 (MEMBERS 자리)
+   ittang_portal v2 — Supabase 공용 로그인·명부(members) 연동
+   · 로그인: Supabase Auth 이메일+비밀번호 (디자인 관리 앱과 동일 계정)
+   · 구성원/권한: members 테이블 (포털이 편집 → 전 앱 공유)
+   · 앱별 권한: members.perms 안의 앱 키(design/mfg/prod/safety/sales/log/site) — 다른 앱의 메뉴 권한 키와 공존
+   · 카드 배치: settings 테이블 key "portal.layout.<memberId>" (기기 무관), 실패 시 localStorage 폴백
    ========================================================= */
 
-/* ---- 앱 주소 기준 경로 ----
-   포털(index.html)과 앱 HTML이 같은 저장소(ittang-work)에 있으므로 상대 경로 "./" 를 씀.
-   → edutain2026.github.io/ittang-work/ 에서도, work.ittang.co.kr 로 도메인을 붙인 뒤에도 수정 없이 동작. */
-const APP_BASE = "./";
+/* ---- Supabase (디자인 관리 앱과 같은 프로젝트) ---- */
+const SUPA = {
+  url: "https://hrrttydpsrfyqlnzbvle.supabase.co",
+  anonKey: "sb_publishable_ZAh-pO05tqQQloR9xQ8UEw_kVEP5yuc",
+  tables: { members: "members", settings: "settings" },
+};
+let sb = null;
+async function supaLib(){
+  if (window.supabase) return window.supabase;
+  await new Promise((res, rej) => { const sc = document.createElement("script"); sc.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
+  return window.supabase;
+}
 
-/* ---- 앱 레지스트리(2026-09 확정 7종): 새 앱은 여기 한 줄만 추가하면 런처에 뜸 ----
-   url 비우고 APP_BASE만 채우면 file로 주소 자동 완성 · 개별 주소가 다르면 url에 직접 입력 · 배포되면 deployed:true */
+/* ---- 앱 레지스트리 (파일명 확정 7종) ---- */
+const APP_BASE = "./";
 const APPS = [
   { key:"design", name:"디자인 관리", file:"IT_design_mgmt.html",  desc:"디자인 기획·설계·간트·작업일지", ac:"#5B37ED", acbg:"#F0ECFE", icon:"layers", url:"", deployed:true  },
   { key:"mfg",    name:"생산관리",    file:"IT_mfg_mgmt.html",     desc:"제작·생산 공정 관리",           ac:"#009632", acbg:"#D9FFE6", icon:"gear",   url:"", deployed:false },
   { key:"prod",   name:"제품관리",    file:"IT_prod_mgmt.html",    desc:"제품 정보·라인업 관리",         ac:"#AD36E3", acbg:"#F7E5FE", icon:"cube",   url:"", deployed:false },
   { key:"safety", name:"안전관리",    file:"IT_safety_mgmt.html",  desc:"현장 안전·점검 관리",           ac:"#E5484D", acbg:"#FDECEC", icon:"shield", url:"", deployed:false },
   { key:"sales",  name:"영업관리",    file:"IT_sales_mgmt.html",   desc:"상담·영업·수주·매출·수금 CRM",  ac:"#3366FF", acbg:"#EAF0FF", icon:"crm",    url:"", deployed:true  },
-  { key:"log",    name:"시공일지",    file:"IT_site_log.html",     desc:"현장 시공일지 기록",             ac:"#0098B2", acbg:"#E1F5F9", icon:"book",   url:"https://singular-liger-9d8d35.netlify.app/", deployed:true  },  // 별도 운영 중(Netlify) → 주소로 연결
+  { key:"log",    name:"시공일지",    file:"IT_site_log.html",     desc:"현장 시공일지 기록",             ac:"#0098B2", acbg:"#E1F5F9", icon:"book",   url:"https://singular-liger-9d8d35.netlify.app/", deployed:true  },
   { key:"site",   name:"현장관리",    file:"IT_site_mgmt.html",    desc:"시공·현장·공정 관리",           ac:"#F55A00", acbg:"#FFEAD9", icon:"pin",    url:"", deployed:true  },
 ];
-/* 앱의 실제 접속 주소: 개별 url 우선, 없으면 APP_BASE+file */
+const APP_KEYS = APPS.map(a => a.key);
 const appUrl = (a) => a.url || (APP_BASE ? APP_BASE + a.file : "");
 
-/* ---- 아이콘(인라인 SVG) ---- */
 function icon(kind,size){
   const s=size||22, p='fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
   const map={
@@ -264,8 +287,6 @@ function icon(kind,size){
     layers:`<path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>`,
     pin:`<path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/>`,
     book:`<path d="M4 4h13a2 2 0 0 1 2 2v14H6a2 2 0 0 1-2-2V4z"/><path d="M4 4v14M9 8h6M9 12h6"/>`,
-    truck:`<path d="M1 6h13v9H1zM14 9h4l3 3v3h-7z"/><circle cx="6" cy="18" r="1.6"/><circle cx="18" cy="18" r="1.6"/>`,
-    search:`<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>`,
     gear:`<circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/>`,
     cube:`<path d="M12 2 3 7v10l9 5 9-5V7l-9-5z"/><path d="M3 7l9 5 9-5M12 12v10"/>`,
     shield:`<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/>`,
@@ -273,115 +294,169 @@ function icon(kind,size){
   return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" ${p}>${map[kind]||""}</svg>`;
 }
 
-/* ---- 직급 & 직급별 앱권한 기본값(프리셋) ---- */
+/* ---- 직급·권한 규칙 (공용데이터 설계안과 동일) ---- */
 const ROLES = ["대표이사","팀장","팀원","스태프"];
+const ROLE_RANK = { "대표이사":3, "팀장":2, "팀원":1, "스태프":0 };
 const ROLE_PRESET = {
   "대표이사": { design:"edit", mfg:"edit", prod:"edit", safety:"edit", sales:"edit", log:"edit", site:"edit" },
   "팀장":     { design:"edit", mfg:"edit", prod:"edit", safety:"edit", sales:"edit", log:"edit", site:"edit" },
   "팀원":     { design:"view", mfg:"view", prod:"view", safety:"view", sales:"edit", log:"view", site:"view" },
   "스태프":   { design:"view", mfg:"none", prod:"none", safety:"view", sales:"none", log:"view", site:"view" },
 };
-const isAdmin = (u) => u && (u.role==="대표이사" || u.role==="팀장");
+const isAdmin = (m) => !!m && ((ROLE_RANK[m.role] ?? -1) >= ROLE_RANK["팀장"] || (m.perms && m.perms.hub === "admin"));
+/* 저장된 perms에 앱 키가 없으면 직급 기본값으로 폴백 (명시적 "none"은 존중) */
+const permOf = (m, key) => (m && m.perms && m.perms[key]) || (ROLE_PRESET[m && m.role] || {})[key] || "none";
 
-/* ---- 데모 구성원(= Supabase members 자리). perms: 앱key→none|view|edit ---- */
-const SEED_MEMBERS = [
-  { id:1, name:"이민철", unit:"대표이사",   role:"대표이사", email:"ceo@ittang.co.kr",
-    perms:{ design:"edit", mfg:"edit", prod:"edit", safety:"edit", sales:"edit", log:"edit", site:"edit" } },
-  { id:2, name:"김대열", unit:"사업1팀",    role:"팀장",     email:"kdy@ittang.co.kr",
-    perms:{ design:"edit", mfg:"view", prod:"view", safety:"edit", sales:"edit", log:"view", site:"edit" } },
-  { id:3, name:"박해솔", unit:"기획파트",   role:"팀원",     email:"phs@ittang.co.kr",
-    perms:{ design:"view", mfg:"view", prod:"edit", safety:"view", sales:"edit", log:"view", site:"view" } },
-  { id:4, name:"장상범", unit:"디자인파트", role:"스태프",   email:"jsb@ittang.co.kr",
-    perms:{ design:"edit", mfg:"none", prod:"view", safety:"none", sales:"none", log:"view", site:"view" } },
-  { id:5, name:"김은지", unit:"설계파트",   role:"스태프",   email:"kej@ittang.co.kr",
-    perms:{ design:"view", mfg:"view", prod:"none", safety:"edit", sales:"none", log:"edit", site:"edit" } },
-];
-
-/* ---- 변경분 localStorage 저장(= Supabase 전환 전 데모 지속) ---- */
-const LS_KEY = "ittang_portal_v1";
-const clone = (o) => JSON.parse(JSON.stringify(o));
-let MEMBERS = clone(SEED_MEMBERS);
-(function loadSaved(){
-  try{
-    const s = JSON.parse(localStorage.getItem(LS_KEY) || "null");
-    if(s && Array.isArray(s.members)){
-      MEMBERS.forEach(m => { const sv = s.members.find(x=>x.id===m.id); if(sv){ m.role = sv.role||m.role; m.perms = { ...m.perms, ...(sv.perms||{}) }; } });
-    }
-  }catch(e){}
-})();
-function saveMembers(){
-  try{ localStorage.setItem(LS_KEY, JSON.stringify({ members: MEMBERS })); }catch(e){}
-  const t=document.getElementById("savedTag"); if(t){ t.classList.remove("hide"); clearTimeout(window._st); window._st=setTimeout(()=>t.classList.add("hide"),1400); }
-}
-
+/* ---- 상태 ---- */
+let MEMBERS = [];
 let currentUser = null;
 
-/* ---- 로그인 화면 데모 버튼 ---- */
-function buildDemoButtons(){
-  document.getElementById("demoRow").innerHTML = MEMBERS.map(m =>
-    `<button class="demobtn" onclick="loginAs(${m.id})"><div class="dn">${m.name}</div><div class="dr">${m.unit} · ${m.role}</div></button>`
-  ).join("");
-}
-function loginByEmail(){
-  const email=(document.getElementById("lgEmail").value||"").trim().toLowerCase();
-  const m=MEMBERS.find(x=>x.email.toLowerCase()===email);
-  if(!m){ alert("데모 구성원 이메일이 아닙니다. 아래 '데모 계정으로 바로 로그인'을 사용하거나, 등록된 이메일(예: ceo@ittang.co.kr)을 입력하세요."); return; }
-  loginAs(m.id);
-}
-function loginAs(id){
-  currentUser = MEMBERS.find(m=>m.id===id);
-  document.getElementById("login").classList.add("hide");
-  document.getElementById("shell").classList.remove("hide");
-  buildUserSel();
-  renderUser();
-  goLauncher();
-}
-function logout(){
-  currentUser=null;
-  document.getElementById("appview").classList.add("hide");
-  document.getElementById("shell").classList.add("hide");
-  document.getElementById("login").classList.remove("hide");
-}
-function switchUser(id){ currentUser=MEMBERS.find(m=>m.id===Number(id)); renderUser(); goLauncher(); }
+const rowToMember = (r) => ({ id:r.id, name:r.name, unit:r.unit||"", role:r.role||"스태프", title:r.title||"", email:r.email||"", phone:r.phone||"",
+  perms: r.perms || {}, active: r.active !== false, aliases: r.aliases || [], sortNo: r.sort_no ?? 9999 });
 
-function buildUserSel(){
-  document.getElementById("userSel").innerHTML = MEMBERS.map(m=>
-    `<option value="${m.id}" ${m.id===currentUser.id?"selected":""}>${m.name} ${m.role}</option>`
-  ).join("");
+async function loadMembers(){
+  const { data, error } = await sb.from(SUPA.tables.members).select("*").order("sort_no");
+  if (error) throw new Error("명부(members)를 읽지 못했습니다: " + error.message);
+  MEMBERS = (data || []).map(rowToMember);
 }
+function findMemberByEmail(email){
+  const e = (email||"").toLowerCase();
+  return MEMBERS.find(m => (m.email||"").toLowerCase() === e && m.active) || null;
+}
+
+/* ---- 로그인 화면 ---- */
+const $ = (id) => document.getElementById(id);
+function showErr(msg){ const el=$("lgErr"); el.textContent = msg; el.classList.remove("hide"); }
+function clearErr(){ $("lgErr").classList.add("hide"); }
+function setBusy(b, txt){ $("lgBtn").disabled=b; $("suBtn").disabled=b; if(txt!==undefined) $("lgStat").textContent = txt; }
+
+async function boot(){
+  setBusy(true, "서버에 연결하는 중…");
+  try{
+    const lib = await supaLib();
+    sb = lib.createClient(SUPA.url, SUPA.anonKey);
+    const { data:{ session } } = await sb.auth.getSession();
+    if (session && session.user){
+      await enterWith(session.user.email);
+      return;
+    }
+  }catch(e){
+    showErr("서버 연결에 실패했습니다. 네트워크를 확인한 뒤 새로고침하세요. (" + (e.message||e) + ")");
+  }
+  setBusy(false, "회사 공용 계정(디자인 관리 앱과 동일)으로 로그인합니다.");
+}
+async function enterWith(email){
+  await loadMembers();
+  const me = findMemberByEmail(email);
+  if (!me){
+    await sb.auth.signOut().catch(()=>{});
+    setBusy(false, "회사 공용 계정(디자인 관리 앱과 동일)으로 로그인합니다.");
+    showErr("로그인은 되었지만 조직도(members)에 이 이메일의 구성원이 없습니다. 관리자(팀장 이상)에게 조직도 등록을 요청하세요. (" + email + ")");
+    return;
+  }
+  currentUser = me;
+  $("login").classList.add("hide");
+  $("shell").classList.remove("hide");
+  renderUser();
+  await goLauncher();
+}
+async function doLogin(){
+  clearErr();
+  const email = $("lgEmail").value.trim(), pw = $("lgPw").value;
+  if (!email){ showErr("이메일을 입력하세요."); return; }
+  if (!pw){ showErr("비밀번호를 입력하세요."); return; }
+  setBusy(true, "로그인 중…");
+  try{
+    const { error } = await sb.auth.signInWithPassword({ email, password: pw });
+    if (error) throw new Error(/invalid/i.test(error.message) ? "이메일 또는 비밀번호가 맞지 않습니다." : error.message);
+    await enterWith(email);
+  }catch(e){ showErr(e.message||String(e)); setBusy(false, "회사 공용 계정(디자인 관리 앱과 동일)으로 로그인합니다."); }
+}
+async function doSignUp(){
+  clearErr();
+  const email = $("lgEmail").value.trim(), pw = $("lgPw").value;
+  if (!email || !pw){ showErr("계정을 만들려면 조직도에 등록된 이메일과 원하는 비밀번호를 입력하세요."); return; }
+  if (pw.length < 6){ showErr("비밀번호는 6자 이상이어야 합니다."); return; }
+  setBusy(true, "계정 만드는 중…");
+  try{
+    const { error } = await sb.auth.signUp({ email, password: pw });
+    if (error) throw new Error(/already/i.test(error.message) ? "이미 계정이 있는 이메일입니다. 위 '로그인'을 누르세요." : error.message);
+    const { error: e2 } = await sb.auth.signInWithPassword({ email, password: pw });
+    if (e2) throw new Error("계정은 만들어졌습니다. 이제 '로그인'을 눌러 들어오세요.");
+    await enterWith(email);
+  }catch(e){ showErr(e.message||String(e)); setBusy(false, "회사 공용 계정(디자인 관리 앱과 동일)으로 로그인합니다."); }
+}
+async function logout(){
+  try{ await sb.auth.signOut(); }catch(e){}
+  currentUser = null;
+  $("appview").classList.add("hide"); $("shell").classList.add("hide"); $("login").classList.remove("hide");
+  $("lgPw").value = ""; clearErr(); setBusy(false, "로그아웃했습니다.");
+}
+$("lgPw").addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
+
 function renderUser(){
-  document.getElementById("uav").textContent = currentUser.name[0];
-  document.getElementById("uname").textContent = currentUser.name;
-  document.getElementById("uunit").textContent = "· "+currentUser.unit+" · "+currentUser.role;
-  document.getElementById("userSel").value = currentUser.id;
-  // 조직도·권한 관리는 관리자(대표이사·팀장)에게만 노출
-  document.getElementById("orgBtn").classList.toggle("hide", !isAdmin(currentUser));
+  $("uav").textContent = currentUser.name[0];
+  $("uname").textContent = currentUser.name;
+  $("uunit").textContent = "· " + [currentUser.unit, currentUser.title || currentUser.role].filter(Boolean).join(" · ");
+  $("orgBtn").classList.toggle("hide", !isAdmin(currentUser));   // 팀장 이상만
+}
+
+/* ---- 카드 배치(16칸) : settings 테이블 저장, 실패 시 localStorage ---- */
+const LAYOUT_LS = "ittang_portal_layout_v2";
+let layoutCache = null;
+const layoutKey = () => "portal.layout." + currentUser.id;
+function normalizeLayout(lay){
+  const size = Math.max(16, APP_KEYS.length);
+  if (!Array.isArray(lay)) lay = APP_KEYS.slice();
+  else {
+    lay = lay.map(k => APP_KEYS.includes(k) ? k : null);
+    const present = new Set(lay.filter(Boolean));
+    APP_KEYS.forEach(k => { if (!present.has(k)) { const i = lay.indexOf(null); if (i < 0) lay.push(k); else lay[i] = k; } });
+  }
+  while (lay.length < size) lay.push(null);
+  return lay;
+}
+async function loadLayout(){
+  if (layoutCache) return layoutCache;
+  let saved = null;
+  try{
+    const { data, error } = await sb.from(SUPA.tables.settings).select("value").eq("key", layoutKey()).maybeSingle();
+    if (!error && data && data.value && Array.isArray(data.value.layout)) saved = data.value.layout;
+  }catch(e){}
+  if (!saved){ try{ const o = JSON.parse(localStorage.getItem(LAYOUT_LS)||"{}"); if (Array.isArray(o[currentUser.id])) saved = o[currentUser.id]; }catch(e){} }
+  layoutCache = { custom: !!saved, layout: normalizeLayout(saved) };
+  return layoutCache;
+}
+async function saveLayout(lay){
+  layoutCache = { custom: true, layout: lay };
+  try{ const o = JSON.parse(localStorage.getItem(LAYOUT_LS)||"{}"); o[currentUser.id] = lay; localStorage.setItem(LAYOUT_LS, JSON.stringify(o)); }catch(e){}
+  try{
+    await sb.from(SUPA.tables.settings).upsert({ key: layoutKey(), value: { layout: lay }, updated_at: new Date().toISOString(), updated_by: currentUser.name });
+  }catch(e){ console.warn("layout server save failed", e); }
+}
+async function doResetLayout(){
+  layoutCache = null;
+  try{ const o = JSON.parse(localStorage.getItem(LAYOUT_LS)||"{}"); delete o[currentUser.id]; localStorage.setItem(LAYOUT_LS, JSON.stringify(o)); }catch(e){}
+  try{ await sb.from(SUPA.tables.settings).delete().eq("key", layoutKey()); }catch(e){}
+  goLauncher();
 }
 
 /* ---- 런처 ---- */
-function goLauncher(){
-  document.getElementById("appview").classList.add("hide");
-  document.getElementById("org").classList.add("hide");
-  document.getElementById("launcher").classList.remove("hide");
-  const grid=document.getElementById("appGrid");
-  document.getElementById("hello").textContent = `안녕하세요, ${currentUser.name}님`;
-  const av = APPS.filter(a=>currentUser.perms[a.key]&&currentUser.perms[a.key]!=="none").length;
-  document.getElementById("hellosub").textContent = `열 수 있는 앱 ${av}개 · 카드를 드래그해 원하는 빈 칸으로 옮기거나 서로 위치를 바꿀 수 있고, 내 계정에 저장됩니다.`;
-  // 커스텀 배치가 있으면 '기본 배치로' 버튼 노출
-  const hasCustom = !!loadLayouts()[currentUser.id];
-  document.getElementById("reorderReset").classList.toggle("hide", !hasCustom);
+async function goLauncher(){
+  $("appview").classList.add("hide"); $("org").classList.add("hide"); $("launcher").classList.remove("hide");
+  $("hello").textContent = `안녕하세요, ${currentUser.name}${currentUser.title ? " " + currentUser.title : ""}님`;
+  const av = APPS.filter(a => permOf(currentUser, a.key) !== "none").length;
+  $("hellosub").textContent = `열 수 있는 앱 ${av}개 · 카드를 드래그해 원하는 빈 칸으로 옮기거나 서로 위치를 바꿀 수 있고, 내 계정에 저장됩니다.`;
+  const { custom, layout } = await loadLayout();
+  $("reorderReset").classList.toggle("hide", !custom);
   const admin = isAdmin(currentUser);
-  const layout = getLayout(currentUser.id);
   const gripSvg = `<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>`;
-  grid.innerHTML = layout.map((key,pos)=>{
-    if(!key){
-      return `<div class="slot-empty ${admin?"can":""}" data-pos="${pos}"
-          ondragover="dragOver(event,${pos})" ondragleave="dragLeave(event)" ondrop="dropCell(event,${pos})" ondragenter="event.preventDefault()"
-          ${admin?'onclick="addAppHint()"':''}><span class="slotplus">+</span><span class="slotlab">앱 추가</span></div>`;
+  $("appGrid").innerHTML = layout.map((key,pos) => {
+    if (!key){
+      return `<div class="slot-empty ${admin?"can":""}" data-pos="${pos}" ondragover="dragOver(event,${pos})" ondragleave="dragLeave(event)" ondrop="dropCell(event,${pos})" ondragenter="event.preventDefault()" ${admin?'onclick="addAppHint()"':''}><span class="slotplus">+</span><span class="slotlab">앱 추가</span></div>`;
     }
-    const a = APPS.find(x=>x.key===key); if(!a) return "";
-    const lv = currentUser.perms[a.key]||"none";
-    const locked = lv==="none";
+    const a = APPS.find(x => x.key === key); if (!a) return "";
+    const lv = permOf(currentUser, a.key), locked = lv === "none";
     const permPill = lv==="edit" ? `<span class="pill pill-edit">작성</span>` : lv==="view" ? `<span class="pill pill-view">조회</span>` : "";
     const depPill = a.deployed ? `<span class="pill pill-dep on">배포됨</span>` : `<span class="pill pill-dep">준비중</span>`;
     return `<div class="appcard ${locked?"locked":""}" draggable="true" data-pos="${pos}" data-key="${a.key}"
@@ -397,148 +472,120 @@ function goLauncher(){
   }).join("");
 }
 function addAppHint(){
-  alert("앱 추가 방법\n\n1) 앱을 배포(공용 주소)합니다.\n2) 이 파일 상단 APPS 레지스트리에 한 줄 추가:\n   { key:\"신규키\", name:\"업무명\", file:\"IT_xxx.html\", desc:\"설명\", ac:\"#색\", acbg:\"#연한색\", icon:\"아이콘\", url:\"\", deployed:true }\n3) 저장하면 런처·권한표에 자동으로 나타납니다.\n\n(Supabase 연동 후에는 이 화면에서 바로 추가하도록 만들 수 있습니다.)");
+  alert("앱 추가 방법\n\n1) 앱 파일(IT_xxx.html)을 GitHub 저장소 ittang-work에 올립니다.\n2) 이 파일(index.html) 상단 APPS 배열에 한 줄 추가하고 deployed:true 로 둡니다.\n3) index.html을 다시 올리면 런처·권한표에 자동으로 나타납니다.");
 }
-
-/* ---- 앱 카드 배치(16칸 위치): 사용자별 저장 · 빈 칸 이동/위치 교체 ---- */
-const LAYOUT_KEY = "ittang_portal_layout";
-function loadLayouts(){ try{ return JSON.parse(localStorage.getItem(LAYOUT_KEY)||"{}")||{}; }catch(e){ return {}; } }
-function saveLayouts(o){ try{ localStorage.setItem(LAYOUT_KEY, JSON.stringify(o)); }catch(e){} }
-function getLayout(uid){
-  const allKeys = APPS.map(a=>a.key);
-  const size = Math.max(16, allKeys.length);   // 최소 4×4
-  let lay = loadLayouts()[uid];
-  if(!Array.isArray(lay)){
-    lay = allKeys.slice();                                  // 기본: 앞에서부터
-  }else{
-    lay = lay.map(k => allKeys.includes(k) ? k : null);     // 없어진 앱 → 빈 칸
-    const present = new Set(lay.filter(Boolean));
-    allKeys.forEach(k=>{ if(!present.has(k)){ const i=lay.indexOf(null); if(i<0) lay.push(k); else lay[i]=k; } }); // 신규 앱은 빈 칸/뒤
-  }
-  while(lay.length<size) lay.push(null);                    // 16칸 확보
-  return lay;
-}
-function setLayout(uid, lay){ const o=loadLayouts(); o[uid]=lay; saveLayouts(o); }
-function doResetOrder(){ const o=loadLayouts(); delete o[currentUser.id]; saveLayouts(o); goLauncher(); }
-
-let dragPos=null;
-function dragStart(e,pos){ dragPos=pos; e.currentTarget.classList.add("dragging"); try{e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",String(pos));}catch(_){} }
-function dragOver(e,pos){ e.preventDefault(); if(pos!==dragPos) e.currentTarget.classList.add("dragover"); }
+let dragPos = null;
+function dragStart(e,pos){ dragPos=pos; e.currentTarget.classList.add("dragging"); try{ e.dataTransfer.effectAllowed="move"; e.dataTransfer.setData("text/plain", String(pos)); }catch(_){} }
+function dragOver(e,pos){ e.preventDefault(); if (pos!==dragPos) e.currentTarget.classList.add("dragover"); }
 function dragLeave(e){ e.currentTarget.classList.remove("dragover"); }
-function dragEnd(e){ document.querySelectorAll(".dragging,.dragover").forEach(el=>el.classList.remove("dragging","dragover")); dragPos=null; }
-function dropCell(e,to){
+function dragEnd(e){ document.querySelectorAll(".dragging,.dragover").forEach(el => el.classList.remove("dragging","dragover")); dragPos=null; }
+async function dropCell(e,to){
   e.preventDefault();
-  if(dragPos===null || dragPos===to){ dragEnd(e); return; }
-  const lay = getLayout(currentUser.id);
+  if (dragPos===null || dragPos===to){ dragEnd(e); return; }
+  const lay = (await loadLayout()).layout.slice();
   const moving = lay[dragPos];
-  if(lay[to]==null){          // 빈 칸으로 이동
-    lay[to] = moving; lay[dragPos] = null;
-  }else{                      // 다른 앱 위 → 위치 서로 교체
-    lay[dragPos] = lay[to]; lay[to] = moving;
-  }
-  setLayout(currentUser.id, lay);
+  if (lay[to]==null){ lay[to]=moving; lay[dragPos]=null; } else { lay[dragPos]=lay[to]; lay[to]=moving; }
   dragPos=null;
+  await saveLayout(lay);
   goLauncher();
 }
 
 /* ---- 앱 열기 ---- */
-let currentApp=null;
 function openApp(key){
-  const a=APPS.find(x=>x.key===key); if(!a) return;
-  const lv=currentUser.perms[key];
-  if(!lv||lv==="none"){ alert("이 앱을 열 권한이 없습니다."); return; }
-  currentApp=a;
-  document.documentElement.style.setProperty("--ac",a.ac);
-  const av=document.getElementById("appview");
-  av.style.setProperty("--ac",a.ac); av.style.setProperty("--acbg",a.acbg);
+  const a = APPS.find(x => x.key===key); if (!a) return;
+  const lv = permOf(currentUser, key);
+  if (lv==="none"){ alert("이 앱을 열 권한이 없습니다. 관리자에게 요청하세요."); return; }
   const url = appUrl(a), live = a.deployed && url;
-  document.getElementById("appbar").innerHTML =
+  const av = $("appview"); av.style.setProperty("--ac", a.ac); av.style.setProperty("--acbg", a.acbg);
+  $("appbar").innerHTML =
     `<span class="dot"></span><span class="abn">${a.name}</span><span class="abid">${a.file}</span>
      <span style="flex:1"></span>
      <span class="pill ${lv==="edit"?"pill-edit":"pill-view"}">${lv==="edit"?"작성 권한":"조회 권한"}</span>
-     ${live?`<button class="ab-btn" onclick="reloadFrame()">새로고침</button>
-       <a class="ab-btn" href="${url}" target="_blank" rel="noreferrer">새 창에서 열기</a>`:""}
+     ${live?`<button class="ab-btn" onclick="reloadFrame()">새로고침</button><a class="ab-btn" href="${url}" target="_blank" rel="noreferrer">새 창에서 열기</a>`:""}
      <button class="ab-btn ab-back" onclick="goLauncher()">← 런처로</button>`;
-  const frame=document.getElementById("appframe"), soon=document.getElementById("appsoon");
-  if(live){
-    soon.classList.add("hide");
-    frame.classList.remove("hide");
-    frame.src=url;
-  }else{
-    frame.classList.add("hide"); frame.src="about:blank";
-    soon.classList.remove("hide");
-    soon.innerHTML=`<div class="si">${icon(a.icon,30)}</div>
-      <h2>${a.name} — 배포 준비 중</h2>
-      <p>이 앱은 아직 공용 주소로 배포되지 않았습니다. 배포가 끝나면 <code>${a.file}</code>을 올리고, 레지스트리에서 상단 <code>APP_BASE</code>(도메인)를 채우거나 이 앱의 <code>url</code>을 입력한 뒤 <code>deployed:true</code>로 바꾸면 이 자리에서 바로 열립니다.</p>`;
+  const frame=$("appframe"), soon=$("appsoon");
+  if (live){ soon.classList.add("hide"); frame.classList.remove("hide"); frame.src=url; }
+  else{
+    frame.classList.add("hide"); frame.src="about:blank"; soon.classList.remove("hide");
+    soon.innerHTML = `<div class="si">${icon(a.icon,30)}</div><h2>${a.name} — 배포 준비 중</h2><p>이 앱은 아직 배포되지 않았습니다. 배포되면 이 자리에서 바로 열립니다.</p>`;
   }
-  document.getElementById("appview").classList.remove("hide");
+  av.classList.remove("hide");
 }
-function reloadFrame(){ const f=document.getElementById("appframe"); f.src=f.src; }
+function reloadFrame(){ const f=$("appframe"); f.src=f.src; }
 
-/* ---- 조직도·권한 관리 화면 ---- */
+/* ---- 조직도·권한 관리 (members 직접 편집) ---- */
 const PERM_LABEL = { none:"숨김", view:"조회", edit:"작성" };
 const PERM_NEXT  = { none:"view", view:"edit", edit:"none" };
+function flashSaved(){ const t=$("savedTag"); t.classList.remove("hide"); clearTimeout(window._st); window._st=setTimeout(()=>t.classList.add("hide"),1400); }
 
 function goOrg(){
-  if(!isAdmin(currentUser)){ alert("조직도·권한 관리는 관리자(대표이사·팀장)만 사용할 수 있습니다."); return; }
-  document.getElementById("appview").classList.add("hide");
-  document.getElementById("launcher").classList.add("hide");
-  document.getElementById("org").classList.remove("hide");
+  if (!isAdmin(currentUser)){ alert("조직도·권한 관리는 관리자(팀장 이상)만 사용할 수 있습니다."); return; }
+  $("appview").classList.add("hide"); $("launcher").classList.add("hide"); $("org").classList.remove("hide");
   renderOrg();
+}
+async function reloadMembers(){
+  try{ await loadMembers(); const me = MEMBERS.find(m => m.id === currentUser.id); if (me) currentUser = me; renderUser(); renderOrg(); flashSaved(); }
+  catch(e){ alert(e.message||e); }
 }
 function renderOrg(){
   const admin = isAdmin(currentUser);
-  document.getElementById("resetAllBtn").disabled = !admin;
-  document.getElementById("orgNotice").innerHTML = admin
-    ? `<div class="orgnotice">지금은 <b>${currentUser.name} ${currentUser.role}</b> 계정으로 수정할 수 있습니다. 변경 즉시 저장되고, 런처의 앱 노출·권한 뱃지에 바로 반영됩니다. (실제 전환 시엔 이 표가 Supabase <code>members</code> 테이블이 됩니다.)</div>`
-    : `<div class="orgnotice">조회 전용입니다. 관리자(대표이사·팀장)만 권한을 바꿀 수 있습니다.</div>`;
-
-  const th = ['<th class="lft">구성원</th>','<th>직급</th>']
-    .concat(APPS.map(a=>`<th>${a.name}<span class="thsub">${a.file}</span></th>`))
-    .concat(['<th></th>']).join("");
-
-  const rows = MEMBERS.map(m=>{
-    const roleOpts = ROLES.map(r=>`<option ${m.role===r?"selected":""}>${r}</option>`).join("");
-    const selfRole = (m.id===currentUser.id); // 본인 직급은 잠금(자기 권한 실수 방지)
-    const cells = APPS.map(a=>{
-      const lv = m.perms[a.key]||"none";
-      return `<td><button class="pchip p-${lv}" ${admin?`onclick="cyclePerm(${m.id},'${a.key}')"`:"disabled"}>${PERM_LABEL[lv]}</button></td>`;
-    }).join("");
-    return `<tr>
-      <td class="mname">${m.name}<span class="munit"> · ${m.unit}</span></td>
-      <td><select class="rolesel" ${(!admin||selfRole)?"disabled":""} onchange="setRole(${m.id},this.value)">${roleOpts}</select></td>
+  $("orgNotice").innerHTML = admin
+    ? `<div class="orgnotice"><b>${currentUser.name} ${currentUser.title||currentUser.role}</b> 계정으로 편집 중 — 변경은 즉시 공용 명부에 저장되고 모든 앱에 반영됩니다. 본인 직급은 실수 방지를 위해 잠겨 있습니다.</div>`
+    : `<div class="orgnotice">조회 전용입니다.</div>`;
+  const q = ($("orgQ").value||"").trim().toLowerCase();
+  const showInactive = $("orgInactive").checked;
+  const rows = MEMBERS.filter(m => (showInactive || m.active) && (!q || [m.name,m.unit,m.title,m.role,m.email].join(" ").toLowerCase().includes(q)))
+                      .sort((a,b) => a.sortNo - b.sortNo || a.id - b.id);
+  $("orgCnt").textContent = `${rows.length}명 표시 · 전체 ${MEMBERS.filter(m=>m.active).length}명 재직`;
+  const th = ['<th class="lft">구성원</th>','<th>직급</th>'].concat(APPS.map(a=>`<th>${a.name}<span class="thsub">${a.file}</span></th>`)).concat(['<th></th>']).join("");
+  const body = rows.map(m => {
+    const roleOpts = ROLES.map(r => `<option ${m.role===r?"selected":""}>${r}</option>`).join("");
+    const self = m.id === currentUser.id;
+    const cells = APPS.map(a => { const lv = permOf(m, a.key);
+      return `<td><button class="pchip p-${lv}" id="pc-${m.id}-${a.key}" ${admin?`onclick="cyclePerm(${m.id},'${a.key}')"`:"disabled"}>${PERM_LABEL[lv]}</button></td>`; }).join("");
+    return `<tr class="${m.active?"":"inactive"}">
+      <td class="mname">${m.name}<span class="munit"> · ${m.unit}</span>${m.title?`<div class="mt">${m.title}${m.active?"":" · 퇴사"}</div>`:""}</td>
+      <td><select class="rolesel" ${(!admin||self)?"disabled":""} onchange="setRole(${m.id},this.value)">${roleOpts}</select></td>
       ${cells}
-      <td><button class="resetbtn" ${admin?"":"disabled"} onclick="resetMember(${m.id})" title="이 구성원 권한을 직급 기본값으로">초기화</button></td>
+      <td><button class="resetbtn" ${admin?"":"disabled"} onclick="resetMember(${m.id})" title="앱 권한을 직급 기본값으로">초기화</button></td>
     </tr>`;
   }).join("");
+  $("orgTable").innerHTML = `<thead><tr>${th}</tr></thead><tbody>${body}</tbody>`;
+}
+/* members.perms 저장: 앱 키만 병합(다른 앱의 메뉴 권한 키는 그대로 유지) */
+async function savePerms(m, patch){
+  const next = { ...(m.perms||{}), ...patch };
+  const { error } = await sb.from(SUPA.tables.members).update({ perms: next }).eq("id", m.id);
+  if (error) throw new Error("권한 저장 실패: " + error.message);
+  m.perms = next;
+}
+async function cyclePerm(id, key){
+  const m = MEMBERS.find(x => x.id===id); if (!m) return;
+  const btn = $(`pc-${id}-${key}`); if (btn) btn.classList.add("busy");
+  const cur = permOf(m, key), nxt = PERM_NEXT[cur];
+  try{ await savePerms(m, { [key]: nxt }); if (m.id===currentUser.id) currentUser = m; flashSaved(); }
+  catch(e){ alert(e.message||e); }
+  renderOrg();
+}
+async function setRole(id, role){
+  const m = MEMBERS.find(x => x.id===id); if (!m) return;
+  const prev = m.role;
+  try{
+    const { error } = await sb.from(SUPA.tables.members).update({ role }).eq("id", m.id);
+    if (error) throw new Error("직급 저장 실패: " + error.message);
+    m.role = role;
+    await savePerms(m, { ...ROLE_PRESET[role] });   // 앱 권한만 직급 기본값으로
+    flashSaved();
+  }catch(e){ m.role = prev; alert(e.message||e); }
+  renderOrg();
+}
+async function resetMember(id){
+  const m = MEMBERS.find(x => x.id===id); if (!m) return;
+  try{ await savePerms(m, { ...ROLE_PRESET[m.role] }); flashSaved(); }catch(e){ alert(e.message||e); }
+  renderOrg();
+}
 
-  document.getElementById("orgTable").innerHTML = `<thead><tr>${th}</tr></thead><tbody>${rows}</tbody>`;
-}
-function cyclePerm(id, appKey){
-  const m = MEMBERS.find(x=>x.id===id); if(!m) return;
-  m.perms[appKey] = PERM_NEXT[m.perms[appKey]||"none"];
-  saveMembers(); renderOrg();
-}
-function setRole(id, role){
-  const m = MEMBERS.find(x=>x.id===id); if(!m) return;
-  m.role = role;
-  m.perms = { ...ROLE_PRESET[role] };   // 직급 변경 → 프리셋으로 초기화
-  saveMembers(); renderOrg();
-}
-function resetMember(id){
-  const m = MEMBERS.find(x=>x.id===id); if(!m) return;
-  m.perms = { ...ROLE_PRESET[m.role] };
-  saveMembers(); renderOrg();
-}
-function resetAll(){
-  if(!confirm("모든 구성원 권한을 초기 데모 값으로 되돌립니다. 계속할까요?")) return;
-  try{ localStorage.removeItem(LS_KEY); }catch(e){}
-  MEMBERS = clone(SEED_MEMBERS);
-  currentUser = MEMBERS.find(x=>x.id===currentUser.id) || MEMBERS[0];
-  renderUser(); renderOrg();
-}
-
-buildDemoButtons();
+boot();
 </script>
 </body>
 </html>
