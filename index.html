@@ -300,8 +300,8 @@ const ROLE_RANK = { "대표이사":3, "팀장":2, "팀원":1, "스태프":0 };
 const ROLE_PRESET = {
   "대표이사": { design:"edit", mfg:"edit", prod:"edit", safety:"edit", sales:"edit", log:"edit", site:"edit" },
   "팀장":     { design:"edit", mfg:"edit", prod:"edit", safety:"edit", sales:"edit", log:"edit", site:"edit" },
-  "팀원":     { design:"view", mfg:"view", prod:"view", safety:"view", sales:"edit", log:"view", site:"view" },
-  "스태프":   { design:"view", mfg:"none", prod:"none", safety:"view", sales:"none", log:"view", site:"view" },
+  "팀원":     { design:"view", mfg:"view", prod:"view", safety:"view", sales:"edit", log:"view", site:"view" },   // 영업 조직(사업1·2팀): 영업 작성, 나머지 조회
+  "스태프":   { design:"edit", mfg:"view", prod:"view", safety:"view", sales:"view", log:"edit", site:"edit" },   // 지원 조직(디자인실·전략기획·경영지원): 디자인·현장·시공일지 작성, 영업 조회
 };
 const isAdmin = (m) => !!m && ((ROLE_RANK[m.role] ?? -1) >= ROLE_RANK["팀장"] || (m.perms && m.perms.hub === "admin"));
 /* 저장된 perms에 앱 키가 없으면 직급 기본값으로 폴백 (명시적 "none"은 존중) */
