@@ -5590,7 +5590,7 @@ async function exportExcel(mode = "all"){
 $("#btnExcel").addEventListener("click", openExportMenu);
 /* ================= 엑셀 일괄 업로드 (관리자) =================
    - 엑셀 다운로드 파일 형식 그대로(프로젝트 코드 기준 매칭)
-   - 파일에 있는 열만 반영, 빈 칸 = 값 비우기, 없는 열 = 변경 없음
+   - 파일에 있는 열만 반영, 빈 칸 = 변경 없음(서버 값 유지 — 값을 지우려면 앱에서 직접), 없는 열 = 변경 없음
    - 계산 열(경과일·위험·수정 차수·회의록 수·등록일·수정일 등)은 무시 */
 const IMP_SKIP = new Set(["업무단계 그룹","수주완료","경과일","위험","수정 차수","회의록 수","웍스 원본 상태","등록일","수정일"]);
 const STAGE_ALIAS = { "상담":"P1", "대기":"P1", "견적요청":"P4", "영업-협의중":"P4", "디자인 수정요청":"P2", "설계 요청":"P7", "실패":"LOST", "수주완료":"P5", "프로젝트완료":"DONE" };
@@ -5681,6 +5681,7 @@ function buildImportPlan(aoa, fileName){
     let bad = false;
     used.forEach(({ f, idx }) => {
       let raw = String(r[idx] ?? "").trim(), v = raw;
+      if (!raw) return;                                   /* 빈 칸 = 변경 없음 (엑셀이 서버보다 오래된 경우 값이 지워지는 사고 방지) */
       if (f.kind === "date"){ v = impDate(raw); if (v === null){ problems.push(`${line}행 ${code || "(신규)"} · ${f.label}: 날짜 형식 오류 "${raw}" — 이 항목 건너뜀`); return; } }
       else if (f.kind === "amount"){ const a = impAmount(raw); if (!a.ok){ problems.push(`${line}행 ${code || "(신규)"} · ${f.label}: 숫자 아님 "${raw}" — 이 항목 건너뜀`); return; } v = a.val; }
       else if (f.kind === "stage"){ if (!raw){ return; } v = impStage(raw); if (!v){ problems.push(`${line}행 ${code || "(신규)"} · 업무단계 "${raw}" 인식 불가 — 이 항목 건너뜀`); return; } }
@@ -5719,6 +5720,7 @@ function renderImportModal(){
       <div><b>${esc(P.fileName)}</b> · ${P.total}행 읽음</div>
       <div class="imp-kpis"><span><b>${nChg}</b>건 변경 (${nDiff}항목)</span><span><b>${P.news.length}</b>건 신규</span><span class="${P.problems.length ? "warn" : ""}"><b>${P.problems.length}</b>건 확인 필요</span></div>
       ${fieldChips ? `<div class="imp-chips">${fieldChips}</div>` : ""}
+      <div class="dim2">빈 칸은 변경하지 않습니다(서버 값 유지). 값을 지우려면 앱에서 직접 수정하세요.</div>
       ${P.ignored.length ? `<div class="dim2">반영하지 않는 열: ${P.ignored.map(esc).join(", ")}</div>` : ""}
     </div>
     ${P.news.length ? `<label class="imp-new"><input type="checkbox" id="impNewOk"> 신규 ${P.news.length}건을 새 프로젝트로 등록 <span class="dim2">(${P.news.slice(0, 5).map(n => esc(n.vals.find(x => x.f.label === "프로젝트명")?.v || n.given)).join(", ")}${P.news.length > 5 ? " 외" : ""})</span></label>` : ""}
