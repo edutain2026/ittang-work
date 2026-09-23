@@ -940,7 +940,7 @@ body.embed .app-header{padding-top:10px;padding-bottom:10px}
 <div id="detailPage" hidden><iframe id="dpFrame" title="프로젝트 상세"></iframe></div>
 
 <footer class="foot">
-  <span>초안 빌드 — 데이터는 메모리에만 보관되며 새로고침 시 초기 상태로 돌아갑니다.</span>
+  <span id="footNote">초안 빌드 — 데이터는 메모리에만 보관되며 새로고침 시 초기 상태로 돌아갑니다.</span>
   <a href="#" id="dlSession" download="itang_session_registrations.json">이번 세션 등록분 JSON 내려받기 (<span id="dlCnt">0</span>건)</a>
 </footer>
 
@@ -1483,7 +1483,8 @@ const EMPLOYEES = MEMBERS.filter(m => m.active).map(mDisplay).sort((a, b) => a.l
 function refreshEmployees(){ EMPLOYEES.splice(0, EMPLOYEES.length, ...MEMBERS.filter(m => m.active).map(mDisplay).sort((a, b) => a.localeCompare(b, "ko"))); }
 const EMPLOYEES_ALL = [...new Set([...EMPLOYEES, ...DATA.flatMap(ownerList)])].sort((a, b) => a.localeCompare(b, "ko"));
 if (new URLSearchParams(location.search).has("embed")) document.body.classList.add("embed");
-DATA.forEach(p => {
+/* 프로젝트 1건을 현재 데이터 모델로 이관 — 내장 데이터와 서버(design_projects)에서 불러온 행 모두에 적용 */
+function migrateProject(p){
   if (!p.history) p.history = [];
   if (!p.meetings) p.meetings = [];
   if (p.owners.cert === undefined) p.owners.cert = null;
@@ -1540,7 +1541,9 @@ DATA.forEach(p => {
   if (p.status === "WON") p.status = "P5";   /* 잠시 쓰였던 수주완료 단계 제거 → 대기중 */
   else if (MIG2[p.status]) p.status = MIG2[p.status];
   p.stageMigrated = true;
-});
+  return p;
+}
+DATA.forEach(migrateProject);
 /* ---- 변경 이력 ---- */
 function nowStr(){
   const d = new Date();
@@ -1651,7 +1654,8 @@ const Store = (() => {
       MEMBERS.splice(0, MEMBERS.length, ...m.data.map(r => mem(r.id, r.name, r.unit, r.role, r.title, { email: r.email, phone: r.phone, perms: r.perms || {}, active: r.active !== false, aliases: r.aliases || [] })));
       const miscRow = p.data.find(r => r.id === MISC.id);
       if (miscRow){ MISC.workLogs = miscRow.data.workLogs || []; MISC.history = miscRow.data.history || []; }
-      DATA.splice(0, DATA.length, ...p.data.filter(r => r.id !== MISC.id).map(r => r.data));
+      DATA.splice(0, DATA.length, ...p.data.filter(r => r.id !== MISC.id).map(r => migrateProject(normalizeProject(r.data))));
+      { const b = document.getElementById("storeBadge"); if (b){ b.dataset.st = "idle"; b.textContent = `서버 · 구성원 ${MEMBERS.filter(x => x.active).length}명 · 프로젝트 ${DATA.length}건`; b.title = "Supabase design_projects에서 로드됨"; } }
       CRM_LEADS.splice(0, CRM_LEADS.length, ...l.data.map(r => ({ ...r, designDetail: r.design_detail || r.designDetail || null, consultDate: r.consult_date || r.consultDate, designOwner: r.design_owner || r.designOwner, planOwner: r.plan_owner || r.planOwner, pmId: r.pm_id || r.pmId })));
     },
     async flush(){
@@ -6875,6 +6879,7 @@ function loadSettings(){
 
 /* ================= 초기화 ================= */
 (async function init(){
+  if (STORE_CONFIG.backend === "supabase"){ const fn = $("#footNote"); if (fn) fn.textContent = "운영 빌드 — 변경 사항은 회사 공용 DB(Supabase)에 저장됩니다."; const dl = $("#dlSession"); if (dl) dl.hidden = true; }
   try { await Store.init(); } catch (e) { console.error("데이터 로드 실패", e); showToast("데이터를 불러오지 못했습니다 — 내장 데이터로 표시합니다"); }
   loadSettings();
   refreshEmployees();
