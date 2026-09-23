@@ -358,7 +358,8 @@ async function enterWith(email){
   $("login").classList.add("hide");
   $("shell").classList.remove("hide");
   renderUser();
-  await goLauncher();
+  if (!validRoute(location.hash)) history.replaceState(null, "", "#/");
+  routeFromHash();
 }
 async function doLogin(){
   clearErr();
@@ -389,6 +390,7 @@ async function doSignUp(){
 async function logout(){
   try{ await sb.auth.signOut(); }catch(e){}
   currentUser = null;
+  history.replaceState(null, "", "#/");
   $("appview").classList.add("hide"); $("shell").classList.add("hide"); $("login").classList.remove("hide");
   $("lgPw").value = ""; clearErr(); setBusy(false, "로그아웃했습니다.");
 }
@@ -441,8 +443,30 @@ async function doResetLayout(){
   goLauncher();
 }
 
+/* ---- 화면 이동 = 브라우저 방문 기록(해시)과 연동: 뒤로가기가 포털 안에서 동작 ---- */
+const validRoute = (h) => h === "#/" || h === "#/org" || /^#\/app\/[a-z]+$/.test(h || "");
+function navigate(h){ if (location.hash === h) routeFromHash(); else location.hash = h; }
+function routeFromHash(){
+  if (!currentUser) return;
+  const h = location.hash;
+  if (h.startsWith("#/app/")) showApp(h.slice(6));
+  else if (h === "#/org") showOrg();
+  else showLauncher();
+}
+window.addEventListener("hashchange", routeFromHash);
+function goLauncher(){ navigate("#/"); }
+function goOrg(){
+  if (!isAdmin(currentUser)){ alert("조직도·권한 관리는 관리자(팀장 이상)만 사용할 수 있습니다."); return; }
+  navigate("#/org");
+}
+function openApp(key){
+  const a = APPS.find(x => x.key===key); if (!a) return;
+  if (permOf(currentUser, key)==="none"){ alert("이 앱을 열 권한이 없습니다. 관리자에게 요청하세요."); return; }
+  navigate("#/app/" + key);
+}
+
 /* ---- 런처 ---- */
-async function goLauncher(){
+async function showLauncher(){
   $("appview").classList.add("hide"); $("org").classList.add("hide"); $("launcher").classList.remove("hide");
   $("hello").textContent = `안녕하세요, ${currentUser.name}${currentUser.title ? " " + currentUser.title : ""}님`;
   const av = APPS.filter(a => permOf(currentUser, a.key) !== "none").length;
@@ -490,11 +514,11 @@ async function dropCell(e,to){
   goLauncher();
 }
 
-/* ---- 앱 열기 ---- */
-function openApp(key){
-  const a = APPS.find(x => x.key===key); if (!a) return;
+/* ---- 앱 열기(렌더) ---- */
+function showApp(key){
+  const a = APPS.find(x => x.key===key); if (!a){ showLauncher(); return; }
   const lv = permOf(currentUser, key);
-  if (lv==="none"){ alert("이 앱을 열 권한이 없습니다. 관리자에게 요청하세요."); return; }
+  if (lv==="none"){ showLauncher(); return; }
   const url = appUrl(a), live = a.deployed && url;
   const av = $("appview"); av.style.setProperty("--ac", a.ac); av.style.setProperty("--acbg", a.acbg);
   $("appbar").innerHTML =
@@ -518,8 +542,8 @@ const PERM_LABEL = { none:"숨김", view:"조회", edit:"작성" };
 const PERM_NEXT  = { none:"view", view:"edit", edit:"none" };
 function flashSaved(){ const t=$("savedTag"); t.classList.remove("hide"); clearTimeout(window._st); window._st=setTimeout(()=>t.classList.add("hide"),1400); }
 
-function goOrg(){
-  if (!isAdmin(currentUser)){ alert("조직도·권한 관리는 관리자(팀장 이상)만 사용할 수 있습니다."); return; }
+function showOrg(){
+  if (!isAdmin(currentUser)){ showLauncher(); return; }
   $("appview").classList.add("hide"); $("launcher").classList.add("hide"); $("org").classList.remove("hide");
   renderOrg();
 }
