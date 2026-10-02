@@ -110,6 +110,11 @@ a{color:var(--accent-text)}
 .login-box .lg-btn{margin-top:4px;padding:10px;font-size:14px;justify-content:center}
 .login-box .lg-err{font-size:12px;color:var(--danger);min-height:14px}
 .login-box .lg-note{font-size:11px;color:var(--ink3);text-align:center}
+/* 비밀번호 변경 */
+.pw-scrim{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:95;display:flex;align-items:center;justify-content:center;padding:24px}
+.pw-scrim .login-box .lg-row{display:flex;gap:8px;justify-content:flex-end;margin-top:4px}
+.pw-scrim .login-box .lg-row button{flex:1;padding:10px;font-size:14px;justify-content:center}
+.pw-scrim .login-box .lg-ok{font-size:12px;color:var(--accent-text);min-height:14px}
 /* 조직도 */
 .org-sub{font-size:11.5px;color:var(--ink3);margin-right:8px}
 .org-wrap{display:flex;flex-direction:column;gap:14px;margin-bottom:8px}
@@ -1054,6 +1059,7 @@ body.embed .app-header{padding-top:10px;padding-bottom:10px}
   <button type="button" class="btn-perm" id="btnExcel">엑셀 다운로드</button>
   <button type="button" class="btn-perm mt-only" id="btnMtMode">회의록 화면</button>
   <button type="button" class="btn-perm" id="btnOrg">조직도</button>
+  <button type="button" class="btn-perm" id="btnPw" title="내 로그인 비밀번호 변경" hidden>비밀번호 변경</button>
   <button type="button" class="btn-perm" id="btnLogout">로그아웃</button>
 </header>
 
@@ -1076,6 +1082,27 @@ body.embed .app-header{padding-top:10px;padding-bottom:10px}
     <div class="lg-err" id="lgErr" role="alert"></div>
     <button class="btn-submit lg-btn" type="button" id="lgBtn">로그인</button>
     <div class="lg-note">Supabase 연동 전 임시 로그인 — 비밀번호는 아직 검증하지 않습니다.</div>
+  </div>
+</div>
+
+<div class="pw-scrim" id="pwScrim" hidden>
+  <div class="login-box" id="pwForm" role="dialog" aria-label="비밀번호 변경">
+    <div class="lg-brand">비밀번호 변경 <small id="pwWho"></small></div>
+    <div class="lg-sub">회사 공용 계정 비밀번호입니다 — 바꾸면 통합 포털·영업관리 등 다른 앱 로그인에도 같이 적용됩니다.</div>
+    <label>현재 비밀번호
+      <input type="password" id="pwCur" autocomplete="current-password">
+    </label>
+    <label>새 비밀번호 (6자 이상)
+      <input type="password" id="pwNew" autocomplete="new-password">
+    </label>
+    <label>새 비밀번호 확인
+      <input type="password" id="pwNew2" autocomplete="new-password">
+    </label>
+    <div class="lg-err" id="pwErr" role="alert"></div>
+    <div class="lg-row">
+      <button class="btn-perm" type="button" id="pwCancel">취소</button>
+      <button class="btn-submit" type="button" id="pwSave">변경</button>
+    </div>
   </div>
 </div>
 
@@ -2039,6 +2066,17 @@ const Store = (() => {
       return data.user;
     },
     async signOut(){ await sb.auth.signOut(); },
+    /* 비밀번호 변경: 현재 비밀번호로 재인증 후 교체 (본인 계정만) */
+    async changePassword(curPw, newPw){
+      const { data: { session } } = await sb.auth.getSession();
+      const email = session && session.user && session.user.email;
+      if (!email) throw new Error("로그인 세션이 없습니다. 다시 로그인하세요.");
+      const re = await sb.auth.signInWithPassword({ email, password: curPw });
+      if (re.error) throw new Error("현재 비밀번호가 올바르지 않습니다.");
+      const { error } = await sb.auth.updateUser({ password: newPw });
+      if (error) throw new Error(error.message || "비밀번호 변경에 실패했습니다.");
+      return email;
+    },
   };
 
   const impl = () => STORE_CONFIG.backend === "supabase" ? supa : local;
@@ -6941,6 +6979,37 @@ async function submitLogin(){
 $("#lgBtn").addEventListener("click", submitLogin);
 $("#loginForm").addEventListener("keydown", e => { if (e.key === "Enter"){ e.preventDefault(); submitLogin(); } });
 $("#btnLogout").addEventListener("click", doLogout);
+/* ---- 비밀번호 변경 (Supabase 모드에서만 노출) ---- */
+function openPw(){
+  if (Store.backend !== "supabase") return;
+  $("#pwWho").textContent = me() ? "· " + me() : "";
+  ["#pwCur","#pwNew","#pwNew2"].forEach(id => { $(id).value = ""; });
+  $("#pwErr").textContent = ""; $("#pwSave").disabled = false;
+  $("#pwScrim").hidden = false;
+  setTimeout(() => $("#pwCur").focus(), 0);
+}
+function closePw(){ $("#pwScrim").hidden = true; }
+async function submitPw(){
+  const cur = $("#pwCur").value, nw = $("#pwNew").value, nw2 = $("#pwNew2").value, err = $("#pwErr");
+  err.textContent = "";
+  if (!cur){ err.textContent = "현재 비밀번호를 입력하세요"; return; }
+  if (nw.length < 6){ err.textContent = "새 비밀번호는 6자 이상이어야 합니다"; return; }
+  if (nw !== nw2){ err.textContent = "새 비밀번호 확인이 일치하지 않습니다"; return; }
+  if (nw === cur){ err.textContent = "현재 비밀번호와 같습니다"; return; }
+  $("#pwSave").disabled = true; err.style.color = "var(--ink3)"; err.textContent = "변경 중…";
+  try {
+    await Store.supa.changePassword(cur, nw);
+    err.style.color = ""; closePw();
+    showToast("비밀번호를 변경했습니다 — 다음 로그인부터 새 비밀번호를 사용하세요");
+  } catch (e) { err.style.color = ""; err.textContent = e.message || "비밀번호 변경에 실패했습니다"; }
+  finally { $("#pwSave").disabled = false; }
+}
+$("#btnPw").addEventListener("click", openPw);
+$("#pwCancel").addEventListener("click", closePw);
+$("#pwSave").addEventListener("click", submitPw);
+$("#pwScrim").addEventListener("click", e => { if (e.target === $("#pwScrim")) closePw(); });
+$("#pwForm").addEventListener("keydown", e => { if (e.key === "Enter"){ e.preventDefault(); submitPw(); } if (e.key === "Escape") closePw(); });
+if (Store.backend === "supabase") $("#btnPw").hidden = false;
 /* 저장 배지 클릭: 로컬 모드에서 이 브라우저의 변경분을 지우고 내장 데이터로 되돌리기(테스트용) */
 $("#storeBadge").addEventListener("click", () => {
   if (Store.backend !== "local") return;
