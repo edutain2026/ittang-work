@@ -158,6 +158,13 @@ table.org{width:100%;border-collapse:collapse;min-width:1080px}
 .pchip.busy{opacity:.5;pointer-events:none}
 .org tr.inactive td{opacity:.55}
 .topbar .tb-badge{font-size:10.5px;color:#00762a;background:#D9FFE6;border-radius:999px;padding:3px 8px;font-weight:700}
+/* 비밀번호 변경 */
+#pwScrim{position:fixed;inset:0;background:rgba(23,23,40,.45);z-index:80;display:flex;align-items:center;justify-content:center;padding:20px}
+#pwScrim .lgcard{padding:26px 28px}
+#pwScrim .pwtitle{font-size:17px;font-weight:800}
+#pwScrim .pwsub{font-size:12.5px;color:var(--ink3);margin-top:4px;line-height:1.5}
+#pwScrim .pwrow{display:flex;gap:8px;margin-top:18px}
+#pwScrim .pwrow .lgbtn{margin-top:0;flex:1}
 </style>
 </head>
 <body>
@@ -195,6 +202,7 @@ table.org{width:100%;border-collapse:collapse;min-width:1080px}
       <span class="av" id="uav">?</span>
       <span><span class="un" id="uname">-</span> <span class="uu" id="uunit"></span></span>
     </div>
+    <button class="tb-btn" onclick="openPw()" title="내 로그인 비밀번호 변경">비밀번호 변경</button>
     <button class="tb-btn" onclick="logout()">로그아웃</button>
   </div>
 
@@ -233,6 +241,25 @@ table.org{width:100%;border-collapse:collapse;min-width:1080px}
       <span class="lc"><i style="background:#EAF0FF"></i>조회 · 열람만</span>
       <span class="lc"><i style="background:#D9FFE6"></i>작성 · 열람+수정</span>
       <span class="lc" style="margin-left:auto">직급 변경 시 그 사람의 <b>앱 권한</b>이 직급 기본값으로 초기화됩니다(다른 앱의 메뉴 권한은 유지).</span>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 비밀번호 변경 ============ -->
+<div id="pwScrim" class="hide" onclick="if(event.target===this)closePw()">
+  <div class="lgcard" onkeydown="if(event.key==='Enter'){event.preventDefault();submitPw();} if(event.key==='Escape')closePw();">
+    <div class="pwtitle">비밀번호 변경 <small id="pwWho" style="font-weight:500;color:var(--ink3);font-size:13px"></small></div>
+    <div class="pwsub">회사 공용 계정 비밀번호입니다. 바꾸면 포털·디자인 관리·영업관리 등 모든 앱 로그인에 같이 적용됩니다.</div>
+    <label>현재 비밀번호</label>
+    <input id="pwCur" type="password" autocomplete="current-password"/>
+    <label>새 비밀번호 (6자 이상)</label>
+    <input id="pwNew" type="password" autocomplete="new-password"/>
+    <label>새 비밀번호 확인</label>
+    <input id="pwNew2" type="password" autocomplete="new-password"/>
+    <div class="lgerr hide" id="pwErr"></div>
+    <div class="pwrow">
+      <button class="lgbtn sec" type="button" onclick="closePw()">취소</button>
+      <button class="lgbtn" type="button" id="pwSave" onclick="submitPw()">변경</button>
     </div>
   </div>
 </div>
@@ -395,6 +422,38 @@ async function logout(){
   $("lgPw").value = ""; clearErr(); setBusy(false, "로그아웃했습니다.");
 }
 $("lgPw").addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
+
+/* ---- 비밀번호 변경: 현재 비밀번호로 재인증 후 교체 (본인 계정만) ---- */
+function openPw(){
+  $("pwWho").textContent = currentUser ? "· " + currentUser.name : "";
+  ["pwCur","pwNew","pwNew2"].forEach(id => { $(id).value = ""; });
+  $("pwErr").classList.add("hide"); $("pwErr").textContent = ""; $("pwSave").disabled = false;
+  $("pwScrim").classList.remove("hide");
+  setTimeout(() => $("pwCur").focus(), 0);
+}
+function closePw(){ $("pwScrim").classList.add("hide"); }
+function pwErr(msg){ const e = $("pwErr"); e.textContent = msg; e.classList.toggle("hide", !msg); }
+async function submitPw(){
+  const cur = $("pwCur").value, nw = $("pwNew").value, nw2 = $("pwNew2").value;
+  pwErr("");
+  if (!cur){ pwErr("현재 비밀번호를 입력하세요."); return; }
+  if (nw.length < 6){ pwErr("새 비밀번호는 6자 이상이어야 합니다."); return; }
+  if (nw !== nw2){ pwErr("새 비밀번호 확인이 일치하지 않습니다."); return; }
+  if (nw === cur){ pwErr("현재 비밀번호와 같습니다."); return; }
+  $("pwSave").disabled = true;
+  try{
+    const { data: { session } } = await sb.auth.getSession();
+    const email = session && session.user && session.user.email;
+    if (!email) throw new Error("로그인 세션이 없습니다. 다시 로그인하세요.");
+    const re = await sb.auth.signInWithPassword({ email, password: cur });
+    if (re.error) throw new Error("현재 비밀번호가 올바르지 않습니다.");
+    const { error } = await sb.auth.updateUser({ password: nw });
+    if (error) throw new Error(error.message || "비밀번호 변경에 실패했습니다.");
+    closePw();
+    alert("비밀번호를 변경했습니다.\n다음 로그인부터 새 비밀번호를 사용하세요 (모든 앱 공통).");
+  }catch(e){ pwErr(e.message || String(e)); }
+  finally{ $("pwSave").disabled = false; }
+}
 
 function renderUser(){
   $("uav").textContent = currentUser.name[0];
